@@ -3,9 +3,10 @@
   "displayName": "Better Terminal Logs",
   "description": "View terminal logs in a collapsible, organized webview panel with real-time updates",
   "version": "0.0.1",
+  "icon": "",
   "publisher": "your-publisher-name",
   "engines": {
-    "vscode": "^1.105.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
     "Other"
@@ -40,13 +41,10 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "@types/vscode": "^1.105.0",
+    "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
-    "@vscode/test-cli": "^0.0.11",
-    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.7.0",
     "electron-rebuild": "^3.2.9",
     "eslint": "^9.34.0",
