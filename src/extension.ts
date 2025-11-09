@@ -47,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
         // Use Shell Integration API to capture terminal output
-        const shellExecutionListener = vscode.window.onDidStartTerminalShellExecution(async event => {
+    const shellExecutionListener = vscode.window.onDidStartTerminalShellExecution(async event => {
             const terminal = event.terminal;
             const execution = event.execution;
 

@@ -39,6 +39,46 @@
             color: var(--vscode-foreground);
         }
 
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-input {
+            padding: 6px 12px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            min-width: 200px;
+        }
+
+        .search-input:focus {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        .search-input::placeholder {
+            color: var(--vscode-input-placeholderForeground);
+        }
+
+        .filter-select {
+            padding: 6px 12px;
+            background-color: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
+            border: 1px solid var(--vscode-dropdown-border);
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            border-color: var(--vscode-focusBorder);
+        }
+
         .clear-btn {
             background-color: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
@@ -283,7 +323,17 @@
 <body>
     <div class="header">
         <h2>🔍 Better Terminal Logs</h2>
-        <button class="clear-btn" onclick="clearCurrentTerminal()">Clear</button>
+        <div class="header-controls">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search logs..." oninput="handleSearch(this.value)">
+            <select id="filterSelect" class="filter-select" onchange="handleFilter(this.value)">
+                <option value="all">All Logs</option>
+                <option value="error">Errors Only</option>
+                <option value="warning">Warnings Only</option>
+                <option value="normal">Normal Only</option>
+                <option value="command">Commands Only</option>
+            </select>
+            <button class="clear-btn" onclick="clearCurrentTerminal()">Clear</button>
+        </div>
     </div>
     
     <div id="tabs" class="tabs-container">
@@ -304,6 +354,8 @@
         
         let activeTerminalId = null;
         const terminals = {};
+        let currentSearchTerm = '';
+        let currentFilter = 'all';
 
         function addTerminal(terminalId, terminalName) {
             if (terminals[terminalId]) {
@@ -359,6 +411,9 @@
 
             terminals[terminalId].tab.classList.add('active');
             terminals[terminalId].logsDiv.classList.add('active');
+
+            // Apply current filters to the switched terminal
+            applyFilters();
 
             // Scroll to bottom
             scrollToBottom(terminals[terminalId].logsDiv);
@@ -424,6 +479,39 @@
 
             terminals[terminalId].logsDiv.appendChild(logEntry);
 
+            // Apply current filters to this new log entry
+            if (terminalId === activeTerminalId) {
+                let shouldShow = true;
+
+                // Get the log type
+                let logType = 'normal';
+                if (log.isCommand) {
+                    logType = 'command';
+                } else if (log.type === 'error') {
+                    logType = 'error';
+                } else if (log.type === 'warning') {
+                    logType = 'warning';
+                }
+
+                // Apply type filter
+                if (currentFilter !== 'all' && logType !== currentFilter) {
+                    shouldShow = false;
+                }
+
+                // Apply search filter
+                if (shouldShow && currentSearchTerm) {
+                    const logText = logEntry.textContent.toLowerCase();
+                    if (!logText.includes(currentSearchTerm)) {
+                        shouldShow = false;
+                    }
+                }
+
+                // Show or hide
+                if (!shouldShow) {
+                    logEntry.style.display = 'none';
+                }
+            }
+
             // Auto-scroll to bottom if active terminal
             if (activeTerminalId === terminalId) {
                 scrollToBottom(terminals[terminalId].logsDiv);
@@ -474,6 +562,55 @@
                     logsContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No terminals open yet.<br>Open a terminal to see its logs here.</p></div>';
                 }
             }
+        }
+
+        function handleSearch(searchTerm) {
+            currentSearchTerm = searchTerm.toLowerCase();
+            applyFilters();
+        }
+
+        function handleFilter(filterType) {
+            currentFilter = filterType;
+            applyFilters();
+        }
+
+        function applyFilters() {
+            if (!activeTerminalId || !terminals[activeTerminalId]) {
+                return;
+            }
+
+            const logsDiv = terminals[activeTerminalId].logsDiv;
+            const logEntries = logsDiv.querySelectorAll('.log-entry');
+
+            logEntries.forEach(logEntry => {
+                let shouldShow = true;
+
+                // Get the log type from CSS classes
+                let logType = 'normal';
+                if (logEntry.classList.contains('log-error')) {
+                    logType = 'error';
+                } else if (logEntry.classList.contains('log-warning')) {
+                    logType = 'warning';
+                } else if (logEntry.classList.contains('log-command')) {
+                    logType = 'command';
+                }
+
+                // Apply type filter
+                if (currentFilter !== 'all' && logType !== currentFilter) {
+                    shouldShow = false;
+                }
+
+                // Apply search filter
+                if (shouldShow && currentSearchTerm) {
+                    const logText = logEntry.textContent.toLowerCase();
+                    if (!logText.includes(currentSearchTerm)) {
+                        shouldShow = false;
+                    }
+                }
+
+                // Show or hide
+                logEntry.style.display = shouldShow ? 'block' : 'none';
+            });
         }
 
         function clearCurrentTerminal() {
