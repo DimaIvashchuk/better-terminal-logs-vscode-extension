@@ -2,7 +2,7 @@
   "name": "better-terminal-logs",
   "displayName": "Better Terminal Logs",
   "description": "View terminal logs in a collapsible, organized webview panel with real-time updates",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "icon": "assets/logo.webp",
   "publisher": "dmytro-ivashchuk",
   "engines": {
