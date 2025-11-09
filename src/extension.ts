@@ -96,12 +96,14 @@ export function activate(context: vscode.ExtensionContext) {
 				// Send structured log to webview (CloudWatch style)
 				if (logsPanel) {
 					console.log('Sending log to webview:', cleanedOutput.substring(0, 50));
+					const logType = detectLogType(cleanedOutput);
 					logsPanel.webview.postMessage({
 						command: 'addLog',
 						terminalId: id,
 						log: {
 							date: new Date().toISOString(),
-							data: cleanedOutput
+							data: cleanedOutput,
+							type: logType
 						}
 					});
 				}
@@ -154,6 +156,55 @@ function cleanTerminalOutput(data: string): string {
 	cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 	
 	return cleaned;
+}
+
+function detectLogType(text: string): 'error' | 'warning' | 'normal' {
+	const lowerText = text.toLowerCase();
+	
+	// Error patterns
+	const errorPatterns = [
+		/\berror\b/i,
+		/\bfailed\b/i,
+		/\bfailure\b/i,
+		/\bexception\b/i,
+		/\bfatal\b/i,
+		/\bcannot\b/i,
+		/\bunable to\b/i,
+		/\bnot found\b/i,
+		/\binvalid\b/i,
+		/\bdenied\b/i,
+		/\brefused\b/i,
+		/exit code [1-9]/i,
+		/^(\s*)at\s+/m, // Stack traces
+		/\[ERROR\]/i,
+		/ERR!/i,
+		/✗|❌|⨯/,
+	];
+	
+	// Warning patterns
+	const warningPatterns = [
+		/\bwarn(ing)?\b/i,
+		/\bcaution\b/i,
+		/\bdeprecated\b/i,
+		/\[WARN\]/i,
+		/⚠/,
+	];
+	
+	// Check for errors
+	for (const pattern of errorPatterns) {
+		if (pattern.test(text)) {
+			return 'error';
+		}
+	}
+	
+	// Check for warnings
+	for (const pattern of warningPatterns) {
+		if (pattern.test(text)) {
+			return 'warning';
+		}
+	}
+	
+	return 'normal';
 }
 
 async function registerTerminalForCapture(terminal: vscode.Terminal) {

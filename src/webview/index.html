@@ -207,6 +207,53 @@
             margin-right: 4px;
         }
 
+        /* Style for error logs */
+        .log-entry.log-error {
+            background: rgba(255, 0, 0, 0.05);
+            border-left: 3px solid var(--vscode-errorForeground);
+            padding: 4px 0;
+            margin-bottom: 4px;
+        }
+
+        .log-entry.log-error .log-summary {
+            color: var(--vscode-errorForeground);
+            font-weight: 500;
+        }
+
+        .log-entry.log-error .log-summary::before {
+            content: '✗ ';
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        .log-entry.log-error .log-content {
+            background-color: rgba(255, 0, 0, 0.08);
+            color: var(--vscode-errorForeground);
+        }
+
+        /* Style for warning logs */
+        .log-entry.log-warning {
+            background: rgba(255, 165, 0, 0.05);
+            border-left: 3px solid var(--vscode-editorWarning-foreground);
+            padding: 4px 0;
+            margin-bottom: 4px;
+        }
+
+        .log-entry.log-warning .log-summary {
+            color: var(--vscode-editorWarning-foreground);
+            font-weight: 500;
+        }
+
+        .log-entry.log-warning .log-summary::before {
+            content: '⚠ ';
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        .log-entry.log-warning .log-content {
+            background-color: rgba(255, 165, 0, 0.08);
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -340,7 +387,17 @@
 
             // Create log entry (CloudWatch style)
             const logEntry = document.createElement('div');
-            logEntry.className = log.isCommand ? 'log-entry log-command' : 'log-entry';
+            
+            // Determine CSS class based on log type
+            let className = 'log-entry';
+            if (log.isCommand) {
+                className += ' log-command';
+            } else if (log.type === 'error') {
+                className += ' log-error';
+            } else if (log.type === 'warning') {
+                className += ' log-warning';
+            }
+            logEntry.className = className;
 
             if (hasMultipleLines) {
                 // Collapsible log with details
