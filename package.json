@@ -3,8 +3,8 @@
   "displayName": "Better Terminal Logs",
   "description": "View terminal logs in a collapsible, organized webview panel with real-time updates",
   "version": "0.0.1",
-  "icon": "https://github.com/DimaIvashchuk/better-terminal-logs-vscode-extension/blob/main/assets/logo.png",
-  "publisher": "your-publisher-name",
+  "icon": "assets/logo.webp",
+  "publisher": "dmytro-ivashchuk",
   "engines": {
     "vscode": "^1.93.0"
   },

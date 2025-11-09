@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Links
 
 - [GitHub Repository](https://github.com/DimaIvashchuk/better-terminal-logs-vscode-extension)
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=your-publisher.better-terminal-logs) *(coming soon)*
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=dmytro-ivashchuk.better-terminal-logs) *(coming soon)*
 - [Report Issues](https://github.com/DimaIvashchuk/better-terminal-logs-vscode-extension/issues)
 
 ---
