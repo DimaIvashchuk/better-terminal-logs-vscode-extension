@@ -5,6 +5,12 @@ A powerful VS Code extension that automatically captures output from **all your 
 ![Better Terminal Logs](https://img.shields.io/badge/status-active-success)
 ![VS Code Version](https://img.shields.io/badge/VS%20Code-%5E1.93.0-blue)
 
+## 📸 Preview
+
+![Better Terminal Logs Preview](assets/preview.webp)
+
+*CloudWatch-style log viewer with multi-terminal tabs, search, filtering, and smart error/warning detection*
+
 ## ✨ Features
 
 ### 🔄 Automatic Terminal Capture
