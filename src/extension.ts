@@ -175,6 +175,19 @@ function cleanTerminalOutput(data: string): string {
 	// This handles overwriting behavior in terminals
 	cleaned = cleaned.replace(/\r(?!\n)/g, '');
 	
+	// Remove zsh prompt artifacts (lines that are just "%" or end with "%")
+	// Split by lines, filter out problematic ones, rejoin
+	const lines = cleaned.split('\n');
+	const filteredLines = lines.filter(line => {
+		const trimmed = line.trim();
+		// Remove lines that are just "%" or just "%\r"
+		if (trimmed === '%' || trimmed === '%\r') {
+			return false;
+		}
+		return true;
+	});
+	cleaned = filteredLines.join('\n');
+	
 	// Clean up multiple consecutive newlines (keep max 2)
 	cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
 	
