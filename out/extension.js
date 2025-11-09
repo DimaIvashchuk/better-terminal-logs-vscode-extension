@@ -39,7 +39,7 @@ const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 let logsPanel;
-const terminalData = {};
+const terminalLogs = {};
 const terminalNames = {};
 function activate(context) {
     console.log('✓ Better Terminal Logs extension is now active!');
@@ -65,7 +65,7 @@ function activate(context) {
         terminal.processId.then(terminalId => {
             if (terminalId) {
                 const id = terminalId.toString();
-                delete terminalData[id];
+                delete terminalLogs[id];
                 delete terminalNames[id];
                 // Notify webview to remove tab
                 if (logsPanel) {
@@ -86,19 +86,27 @@ function activate(context) {
             return;
         }
         const id = terminalId.toString();
-        // Send the command that was executed
+        // Store and send the command that was executed
         const commandLine = execution.commandLine;
-        if (commandLine && commandLine.value && logsPanel) {
-            console.log('Sending command to webview:', commandLine.value);
-            logsPanel.webview.postMessage({
-                command: 'addLog',
-                terminalId: id,
-                log: {
-                    date: new Date().toISOString(),
-                    data: commandLine.value,
-                    isCommand: true
-                }
-            });
+        if (commandLine && commandLine.value) {
+            const logEntry = {
+                date: new Date().toISOString(),
+                data: commandLine.value,
+                isCommand: true
+            };
+            // Store the log
+            if (terminalLogs[id]) {
+                terminalLogs[id].push(logEntry);
+            }
+            // Send to panel if it exists
+            if (logsPanel) {
+                console.log('Sending command to webview:', commandLine.value);
+                logsPanel.webview.postMessage({
+                    command: 'addLog',
+                    terminalId: id,
+                    log: logEntry
+                });
+            }
         }
         // Read the output stream
         const stream = execution.read();
@@ -113,22 +121,24 @@ function activate(context) {
                 if (!hasContent) {
                     continue;
                 }
-                // Store data
-                if (terminalData[id] !== undefined) {
-                    terminalData[id] += cleanedOutput;
+                // Store and send structured log (CloudWatch style)
+                const logType = detectLogType(cleanedOutput);
+                const logEntry = {
+                    date: new Date().toISOString(),
+                    data: cleanedOutput,
+                    type: logType
+                };
+                // Store the log
+                if (terminalLogs[id]) {
+                    terminalLogs[id].push(logEntry);
                 }
-                // Send structured log to webview (CloudWatch style)
+                // Send to panel if it exists
                 if (logsPanel) {
                     console.log('Sending log to webview:', cleanedOutput.substring(0, 50));
-                    const logType = detectLogType(cleanedOutput);
                     logsPanel.webview.postMessage({
                         command: 'addLog',
                         terminalId: id,
-                        log: {
-                            date: new Date().toISOString(),
-                            data: cleanedOutput,
-                            type: logType
-                        }
+                        log: logEntry
                     });
                 }
             }
@@ -220,13 +230,13 @@ async function registerTerminalForCapture(terminal) {
         }
         const id = terminalId.toString();
         // Check if already registered
-        if (terminalData[id] !== undefined) {
+        if (terminalLogs[id] !== undefined) {
             console.log('Terminal already registered:', id);
             return;
         }
         // Get terminal name with fallback
-        const terminalName = terminal.name || `Terminal ${Object.keys(terminalData).length + 1}`;
-        terminalData[id] = '';
+        const terminalName = terminal.name || `Terminal ${Object.keys(terminalLogs).length + 1}`;
+        terminalLogs[id] = [];
         terminalNames[id] = terminalName;
         console.log('Registering terminal:', id, terminalName);
         // Notify webview about new terminal
@@ -249,21 +259,24 @@ function createLogsPanel(context) {
         retainContextWhenHidden: true
     });
     logsPanel.webview.html = getWebviewContent(context);
-    // Send initial terminal list to webview
+    // Send initial terminal list and replay all stored logs
     setTimeout(() => {
         if (logsPanel) {
-            Object.keys(terminalData).forEach(terminalId => {
+            Object.keys(terminalLogs).forEach(terminalId => {
                 logsPanel.webview.postMessage({
                     command: 'addTerminal',
                     terminalId: terminalId,
                     terminalName: terminalNames[terminalId]
                 });
-                // Send existing data if any
-                if (terminalData[terminalId]) {
-                    logsPanel.webview.postMessage({
-                        command: 'addData',
-                        terminalId: terminalId,
-                        data: terminalData[terminalId]
+                // Replay all stored logs for this terminal
+                if (terminalLogs[terminalId] && terminalLogs[terminalId].length > 0) {
+                    console.log(`Replaying ${terminalLogs[terminalId].length} logs for terminal ${terminalId}`);
+                    terminalLogs[terminalId].forEach(logEntry => {
+                        logsPanel.webview.postMessage({
+                            command: 'addLog',
+                            terminalId: terminalId,
+                            log: logEntry
+                        });
                     });
                 }
             });
@@ -272,9 +285,9 @@ function createLogsPanel(context) {
     logsPanel.webview.onDidReceiveMessage(message => {
         switch (message.command) {
             case 'clear':
-                // Clear specific terminal data
-                if (message.terminalId && terminalData[message.terminalId]) {
-                    terminalData[message.terminalId] = '';
+                // Clear specific terminal logs
+                if (message.terminalId && terminalLogs[message.terminalId]) {
+                    terminalLogs[message.terminalId] = [];
                 }
                 return;
         }

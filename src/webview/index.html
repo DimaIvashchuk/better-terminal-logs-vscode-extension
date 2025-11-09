@@ -385,8 +385,7 @@
             // Store terminal data
             terminals[terminalId] = {
                 tab: tab,
-                logsDiv: terminalLogs,
-                data: ''
+                logsDiv: terminalLogs
             };
 
             // Auto-select first terminal
@@ -423,9 +422,6 @@
             if (!terminals[terminalId]) {
                 return;
             }
-
-            // Store data
-            terminals[terminalId].data += log.data;
 
             // Format timestamp
             const date = new Date(log.date);
@@ -620,7 +616,6 @@
 
             // Clear the logs div
             terminals[activeTerminalId].logsDiv.innerHTML = '';
-            terminals[activeTerminalId].data = '';
 
             // Send message to extension to clear backend data
             vscode.postMessage({
