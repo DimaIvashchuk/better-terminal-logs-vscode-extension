@@ -93,21 +93,26 @@ function activate(context) {
             for await (const data of stream) {
                 // Clean the output to remove escape sequences
                 const cleanedOutput = cleanTerminalOutput(data);
-                // Only process if there's actual content after cleaning
-                if (!cleanedOutput.trim()) {
+                // Check if there's actual non-empty content after cleaning
+                // Split by lines and check if at least one line has content
+                const hasContent = cleanedOutput.split('\n').some(line => line.trim().length > 0);
+                if (!hasContent) {
                     continue;
                 }
                 // Store data
                 if (terminalData[id] !== undefined) {
                     terminalData[id] += cleanedOutput;
                 }
-                // Send to webview
+                // Send structured log to webview (CloudWatch style)
                 if (logsPanel) {
-                    console.log('Sending cleaned data to webview:', cleanedOutput);
+                    console.log('Sending log to webview:', cleanedOutput.substring(0, 50));
                     logsPanel.webview.postMessage({
-                        command: 'addData',
+                        command: 'addLog',
                         terminalId: id,
-                        data: cleanedOutput
+                        log: {
+                            date: new Date().toISOString(),
+                            data: cleanedOutput
+                        }
                     });
                 }
             }

@@ -99,13 +99,93 @@
             display: block;
         }
 
-        .log-line {
+        .log-entry {
+            margin-bottom: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--vscode-panel-border);
+            background-color: var(--vscode-editor-background);
+        }
+
+        details {
+            cursor: pointer;
+        }
+
+        summary {
+            padding: 10px 12px;
+            font-weight: 500;
+            list-style: none;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+
+        summary:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::before {
+            content: '▶';
+            display: inline-block;
+            width: 12px;
+            font-size: 10px;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .log-timestamp {
+            font-size: 11px;
+            opacity: 0.7;
+            font-family: var(--vscode-editor-font-family);
+            color: var(--vscode-descriptionForeground);
+            flex-shrink: 0;
+            min-width: 80px;
+        }
+
+        .log-summary {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             font-family: var(--vscode-editor-font-family);
             font-size: 13px;
-            line-height: 1.4;
+        }
+
+        .log-content {
+            padding: 12px;
+            background-color: var(--vscode-textCodeBlock-background);
+            border-top: 1px solid var(--vscode-panel-border);
+            font-family: var(--vscode-editor-font-family);
+            font-size: 13px;
+            line-height: 1.6;
             white-space: pre-wrap;
-            word-break: break-all;
-            margin-bottom: 2px;
+            word-break: break-word;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .log-entry {
+            animation: slideIn 0.3s ease-out;
         }
 
         .empty-state {
@@ -218,30 +298,81 @@
             scrollToBottom(terminals[terminalId].logsDiv);
         }
 
-        function addData(terminalId, data) {
+        function addLog(terminalId, log) {
             if (!terminals[terminalId]) {
                 return;
             }
 
             // Store data
-            terminals[terminalId].data += data;
+            terminals[terminalId].data += log.data;
 
-            // Render if active terminal
-            if (activeTerminalId === terminalId) {
-                const logLine = document.createElement('div');
-                logLine.className = 'log-line';
-                logLine.textContent = data;
-                terminals[terminalId].logsDiv.appendChild(logLine);
+            // Format timestamp
+            const date = new Date(log.date);
+            const timeString = date.toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
 
-                // Auto-scroll to bottom
-                scrollToBottom(terminals[terminalId].logsDiv);
+            // Get preview (first line or truncated)
+            const preview = getLogPreview(log.data);
+            const hasMultipleLines = log.data.includes('\n') || log.data.length > 100;
+
+            // Create log entry (CloudWatch style)
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+
+            if (hasMultipleLines) {
+                // Collapsible log with details
+                logEntry.innerHTML = `
+                    <details>
+                        <summary>
+                            <span class="log-timestamp">${timeString}</span>
+                            <span class="log-summary">${escapeHtml(preview)}</span>
+                        </summary>
+                        <div class="log-content">${escapeHtml(log.data)}</div>
+                    </details>
+                `;
             } else {
-                // Just append for later rendering when terminal becomes active
-                const logLine = document.createElement('div');
-                logLine.className = 'log-line';
-                logLine.textContent = data;
-                terminals[terminalId].logsDiv.appendChild(logLine);
+                // Single line log
+                logEntry.innerHTML = `
+                    <details>
+                        <summary>
+                            <span class="log-timestamp">${timeString}</span>
+                            <span class="log-summary">${escapeHtml(log.data)}</span>
+                        </summary>
+                    </details>
+                `;
             }
+
+            terminals[terminalId].logsDiv.appendChild(logEntry);
+
+            // Auto-scroll to bottom if active terminal
+            if (activeTerminalId === terminalId) {
+                scrollToBottom(terminals[terminalId].logsDiv);
+            }
+        }
+
+        function getLogPreview(text) {
+            // Split into lines and find first non-empty line
+            const lines = text.split('\n');
+            const firstNonEmptyLine = lines.find(line => line.trim().length > 0);
+            
+            if (!firstNonEmptyLine) {
+                return text.substring(0, 100);
+            }
+            
+            // Truncate if too long
+            return firstNonEmptyLine.length > 100 
+                ? firstNonEmptyLine.substring(0, 100) + '...' 
+                : firstNonEmptyLine;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function removeTerminal(terminalId) {
@@ -299,8 +430,8 @@
                     console.log('Adding terminal:', message.terminalId, message.terminalName);
                     addTerminal(message.terminalId, message.terminalName);
                     break;
-                case 'addData':
-                    addData(message.terminalId, message.data);
+                case 'addLog':
+                    addLog(message.terminalId, message.log);
                     break;
                 case 'removeTerminal':
                     console.log('Removing terminal:', message.terminalId);
