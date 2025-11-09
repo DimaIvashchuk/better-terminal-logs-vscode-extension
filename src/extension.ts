@@ -15,6 +15,9 @@ const terminalNames: { [key: string]: string } = {};
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('✓ Better Terminal Logs extension is now active!');
+	
+	// Show activation notification
+	vscode.window.showInformationMessage('🔍 Better Terminal Logs is now active!');
 
 	// Command: Show Better Logs
 	const showLogsCommand = vscode.commands.registerCommand('better-terminal-logs.showBetterLogs', () => {
