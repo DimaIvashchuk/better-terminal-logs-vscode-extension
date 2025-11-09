@@ -46,18 +46,33 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 	});
 
-	// Use Shell Integration API to capture terminal output
-	const shellExecutionListener = vscode.window.onDidStartTerminalShellExecution(async event => {
-		const terminal = event.terminal;
-		const execution = event.execution;
+        // Use Shell Integration API to capture terminal output
+        const shellExecutionListener = vscode.window.onDidStartTerminalShellExecution(async event => {
+            const terminal = event.terminal;
+            const execution = event.execution;
 
-		const terminalId = await terminal.processId;
-		if (!terminalId) { return; }
-		
-		const id = terminalId.toString();
+            const terminalId = await terminal.processId;
+            if (!terminalId) { return; }
+            
+            const id = terminalId.toString();
 
-		// Read the output stream
-		const stream = execution.read();
+            // Send the command that was executed
+            const commandLine = execution.commandLine;
+            if (commandLine && commandLine.value && logsPanel) {
+                console.log('Sending command to webview:', commandLine.value);
+                logsPanel.webview.postMessage({
+                    command: 'addLog',
+                    terminalId: id,
+                    log: {
+                        date: new Date().toISOString(),
+                        data: commandLine.value,
+                        isCommand: true
+                    }
+                });
+            }
+
+            // Read the output stream
+            const stream = execution.read();
 		
 		// Handle data from the stream asynchronously
 		(async () => {

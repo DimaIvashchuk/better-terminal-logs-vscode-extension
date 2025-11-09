@@ -188,6 +188,25 @@
             animation: slideIn 0.3s ease-out;
         }
 
+        /* Style for command logs */
+        .log-entry.log-command {
+            background: rgba(0, 255, 0, 0.05);
+            padding: 4px 0;
+            border-left: 3px solid var(--vscode-terminal-ansiGreen);
+            margin-bottom: 4px;
+        }
+
+        .log-entry.log-command .log-summary {
+            font-weight: 600;
+            color: var(--vscode-terminal-ansiGreen);
+        }
+
+        .log-entry.log-command .log-summary::before {
+            content: '$ ';
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -321,7 +340,7 @@
 
             // Create log entry (CloudWatch style)
             const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry';
+            logEntry.className = log.isCommand ? 'log-entry log-command' : 'log-entry';
 
             if (hasMultipleLines) {
                 // Collapsible log with details

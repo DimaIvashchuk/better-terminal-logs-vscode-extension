@@ -86,6 +86,20 @@ function activate(context) {
             return;
         }
         const id = terminalId.toString();
+        // Send the command that was executed
+        const commandLine = execution.commandLine;
+        if (commandLine && commandLine.value && logsPanel) {
+            console.log('Sending command to webview:', commandLine.value);
+            logsPanel.webview.postMessage({
+                command: 'addLog',
+                terminalId: id,
+                log: {
+                    date: new Date().toISOString(),
+                    data: commandLine.value,
+                    isCommand: true
+                }
+            });
+        }
         // Read the output stream
         const stream = execution.read();
         // Handle data from the stream asynchronously
