@@ -62,7 +62,7 @@ Detects 15+ error patterns and 5+ warning patterns automatically!
 
 **Or install from command line:**
 ```bash
-code --install-extension your-publisher.better-terminal-logs
+code --install-extension dmytro-ivashchuk.better-terminal-logs
 ```
 
 > **Note:** The extension activates automatically when VS Code starts - no configuration needed!
