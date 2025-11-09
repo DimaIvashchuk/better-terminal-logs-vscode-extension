@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Better Terminal Logs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+            padding: 0;
+            overflow-x: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .header h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--vscode-foreground);
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-input {
+            padding: 6px 12px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            min-width: 200px;
+        }
+
+        .search-input:focus {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        .search-input::placeholder {
+            color: var(--vscode-input-placeholderForeground);
+        }
+
+        .filter-select {
+            padding: 6px 12px;
+            background-color: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
+            border: 1px solid var(--vscode-dropdown-border);
+            border-radius: 4px;
+            font-size: 13px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .filter-select:focus {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        .clear-btn {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 2px;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .clear-btn:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .tabs-container {
+            display: flex;
+            background-color: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            overflow-x: auto;
+            flex-shrink: 0;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--vscode-foreground);
+            opacity: 0.7;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            opacity: 1;
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .tab.active {
+            opacity: 1;
+            border-bottom-color: var(--vscode-focusBorder);
+        }
+
+        .logs-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .terminal-logs {
+            display: none;
+        }
+
+        .terminal-logs.active {
+            display: block;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid var(--vscode-panel-border);
+            background-color: var(--vscode-editor-background);
+        }
+
+        details {
+            cursor: pointer;
+        }
+
+        summary {
+            padding: 10px 12px;
+            font-weight: 500;
+            list-style: none;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+
+        summary:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        summary::before {
+            content: '▶';
+            display: inline-block;
+            width: 12px;
+            font-size: 10px;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .log-timestamp {
+            font-size: 11px;
+            opacity: 0.7;
+            font-family: var(--vscode-editor-font-family);
+            color: var(--vscode-descriptionForeground);
+            flex-shrink: 0;
+            min-width: 80px;
+        }
+
+        .log-summary {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: var(--vscode-editor-font-family);
+            font-size: 13px;
+        }
+
+        .log-content {
+            padding: 12px;
+            background-color: var(--vscode-textCodeBlock-background);
+            border-top: 1px solid var(--vscode-panel-border);
+            font-family: var(--vscode-editor-font-family);
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .log-entry {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        /* Style for command logs */
+        .log-entry.log-command {
+            background: rgba(0, 255, 0, 0.05);
+            padding: 4px 0;
+            border-left: 3px solid var(--vscode-terminal-ansiGreen);
+            margin-bottom: 4px;
+        }
+
+        .log-entry.log-command .log-summary {
+            font-weight: 600;
+            color: var(--vscode-terminal-ansiGreen);
+        }
+
+        .log-entry.log-command .log-summary::before {
+            content: '$ ';
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        /* Style for error logs */
+        .log-entry.log-error {
+            background: rgba(255, 0, 0, 0.05);
+            border-left: 3px solid var(--vscode-errorForeground);
+            padding: 4px 0;
+            margin-bottom: 4px;
+        }
+
+        .log-entry.log-error .log-summary {
+            color: var(--vscode-errorForeground);
+            font-weight: 500;
+        }
+
+        .log-entry.log-error .log-summary::before {
+            content: '✗ ';
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        .log-entry.log-error .log-content {
+            background-color: rgba(255, 0, 0, 0.08);
+            color: var(--vscode-errorForeground);
+        }
+
+        /* Style for warning logs */
+        .log-entry.log-warning {
+            background: rgba(255, 165, 0, 0.05);
+            border-left: 3px solid var(--vscode-editorWarning-foreground);
+            padding: 4px 0;
+            margin-bottom: 4px;
+        }
+
+        .log-entry.log-warning .log-summary {
+            color: var(--vscode-editorWarning-foreground);
+            font-weight: 500;
+        }
+
+        .log-entry.log-warning .log-summary::before {
+            content: '⚠ ';
+            font-weight: bold;
+            margin-right: 4px;
+        }
+
+        .log-entry.log-warning .log-content {
+            background-color: rgba(255, 165, 0, 0.08);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: var(--vscode-scrollbarSlider-background);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: var(--vscode-scrollbarSlider-hoverBackground);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>🔍 Better Terminal Logs</h2>
+        <div class="header-controls">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search logs..." oninput="handleSearch(this.value)">
+            <select id="filterSelect" class="filter-select" onchange="handleFilter(this.value)">
+                <option value="all">All Logs</option>
+                <option value="error">Errors Only</option>
+                <option value="warning">Warnings Only</option>
+                <option value="normal">Normal Only</option>
+                <option value="command">Commands Only</option>
+            </select>
+            <button class="clear-btn" onclick="clearCurrentTerminal()">Clear</button>
+        </div>
+    </div>
+    
+    <div id="tabs" class="tabs-container">
+        <!-- Tabs will be added dynamically -->
+    </div>
+
+    <div id="logsContainer" class="logs-container">
+        <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>No terminals open yet.<br>Open a terminal to see its logs here.</p>
+        </div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        const tabsContainer = document.getElementById('tabs');
+        const logsContainer = document.getElementById('logsContainer');
+        
+        let activeTerminalId = null;
+        const terminals = {};
+        let currentSearchTerm = '';
+        let currentFilter = 'all';
+
+        function addTerminal(terminalId, terminalName) {
+            if (terminals[terminalId]) {
+                return; // Terminal already exists
+            }
+
+            // Remove empty state
+            const emptyState = logsContainer.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            // Create tab
+            const tab = document.createElement('button');
+            tab.className = 'tab';
+            tab.textContent = terminalName;
+            tab.dataset.terminalId = terminalId;
+            tab.onclick = () => switchToTerminal(terminalId);
+            tabsContainer.appendChild(tab);
+
+            // Create logs container for this terminal
+            const terminalLogs = document.createElement('div');
+            terminalLogs.className = 'terminal-logs';
+            terminalLogs.dataset.terminalId = terminalId;
+            logsContainer.appendChild(terminalLogs);
+
+            // Store terminal data
+            terminals[terminalId] = {
+                tab: tab,
+                logsDiv: terminalLogs
+            };
+
+            // Auto-select first terminal
+            if (!activeTerminalId) {
+                switchToTerminal(terminalId);
+            }
+        }
+
+        function switchToTerminal(terminalId) {
+            if (!terminals[terminalId]) {
+                return;
+            }
+
+            // Update active terminal
+            activeTerminalId = terminalId;
+
+            // Update tabs
+            Object.values(terminals).forEach(terminal => {
+                terminal.tab.classList.remove('active');
+                terminal.logsDiv.classList.remove('active');
+            });
+
+            terminals[terminalId].tab.classList.add('active');
+            terminals[terminalId].logsDiv.classList.add('active');
+
+            // Apply current filters to the switched terminal
+            applyFilters();
+
+            // Scroll to bottom
+            scrollToBottom(terminals[terminalId].logsDiv);
+        }
+
+        function addLog(terminalId, log) {
+            if (!terminals[terminalId]) {
+                return;
+            }
+
+            // Format timestamp
+            const date = new Date(log.date);
+            const timeString = date.toLocaleTimeString('en-US', { 
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+
+            // Get preview (first line or truncated)
+            const preview = getLogPreview(log.data);
+            const hasMultipleLines = log.data.includes('\n') || log.data.length > 100;
+
+            // Create log entry (CloudWatch style)
+            const logEntry = document.createElement('div');
+            
+            // Determine CSS class based on log type
+            let className = 'log-entry';
+            if (log.isCommand) {
+                className += ' log-command';
+            } else if (log.type === 'error') {
+                className += ' log-error';
+            } else if (log.type === 'warning') {
+                className += ' log-warning';
+            }
+            logEntry.className = className;
+
+            if (hasMultipleLines) {
+                // Collapsible log with details
+                logEntry.innerHTML = `
+                    <details>
+                        <summary>
+                            <span class="log-timestamp">${timeString}</span>
+                            <span class="log-summary">${escapeHtml(preview)}</span>
+                        </summary>
+                        <div class="log-content">${escapeHtml(log.data)}</div>
+                    </details>
+                `;
+            } else {
+                // Single line log
+                logEntry.innerHTML = `
+                    <details>
+                        <summary>
+                            <span class="log-timestamp">${timeString}</span>
+                            <span class="log-summary">${escapeHtml(log.data)}</span>
+                        </summary>
+                    </details>
+                `;
+            }
+
+            terminals[terminalId].logsDiv.appendChild(logEntry);
+
+            // Apply current filters to this new log entry
+            if (terminalId === activeTerminalId) {
+                let shouldShow = true;
+
+                // Get the log type
+                let logType = 'normal';
+                if (log.isCommand) {
+                    logType = 'command';
+                } else if (log.type === 'error') {
+                    logType = 'error';
+                } else if (log.type === 'warning') {
+                    logType = 'warning';
+                }
+
+                // Apply type filter
+                if (currentFilter !== 'all' && logType !== currentFilter) {
+                    shouldShow = false;
+                }
+
+                // Apply search filter
+                if (shouldShow && currentSearchTerm) {
+                    const logText = logEntry.textContent.toLowerCase();
+                    if (!logText.includes(currentSearchTerm)) {
+                        shouldShow = false;
+                    }
+                }
+
+                // Show or hide
+                if (!shouldShow) {
+                    logEntry.style.display = 'none';
+                }
+            }
+
+            // Auto-scroll to bottom if active terminal
+            if (activeTerminalId === terminalId) {
+                scrollToBottom(terminals[terminalId].logsDiv);
+            }
+        }
+
+        function getLogPreview(text) {
+            // Split into lines and find first non-empty line
+            const lines = text.split('\n');
+            const firstNonEmptyLine = lines.find(line => line.trim().length > 0);
+            
+            if (!firstNonEmptyLine) {
+                return text.substring(0, 100);
+            }
+            
+            // Truncate if too long
+            return firstNonEmptyLine.length > 100 
+                ? firstNonEmptyLine.substring(0, 100) + '...' 
+                : firstNonEmptyLine;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function removeTerminal(terminalId) {
+            if (!terminals[terminalId]) {
+                return;
+            }
+
+            // Remove tab and logs
+            terminals[terminalId].tab.remove();
+            terminals[terminalId].logsDiv.remove();
+
+            // Delete from terminals object
+            delete terminals[terminalId];
+
+            // If this was the active terminal, switch to another
+            if (activeTerminalId === terminalId) {
+                const remainingTerminals = Object.keys(terminals);
+                if (remainingTerminals.length > 0) {
+                    switchToTerminal(remainingTerminals[0]);
+                } else {
+                    // No terminals left, show empty state
+                    activeTerminalId = null;
+                    logsContainer.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No terminals open yet.<br>Open a terminal to see its logs here.</p></div>';
+                }
+            }
+        }
+
+        function handleSearch(searchTerm) {
+            currentSearchTerm = searchTerm.toLowerCase();
+            applyFilters();
+        }
+
+        function handleFilter(filterType) {
+            currentFilter = filterType;
+            applyFilters();
+        }
+
+        function applyFilters() {
+            if (!activeTerminalId || !terminals[activeTerminalId]) {
+                return;
+            }
+
+            const logsDiv = terminals[activeTerminalId].logsDiv;
+            const logEntries = logsDiv.querySelectorAll('.log-entry');
+
+            logEntries.forEach(logEntry => {
+                let shouldShow = true;
+
+                // Get the log type from CSS classes
+                let logType = 'normal';
+                if (logEntry.classList.contains('log-error')) {
+                    logType = 'error';
+                } else if (logEntry.classList.contains('log-warning')) {
+                    logType = 'warning';
+                } else if (logEntry.classList.contains('log-command')) {
+                    logType = 'command';
+                }
+
+                // Apply type filter
+                if (currentFilter !== 'all' && logType !== currentFilter) {
+                    shouldShow = false;
+                }
+
+                // Apply search filter
+                if (shouldShow && currentSearchTerm) {
+                    const logText = logEntry.textContent.toLowerCase();
+                    if (!logText.includes(currentSearchTerm)) {
+                        shouldShow = false;
+                    }
+                }
+
+                // Show or hide
+                logEntry.style.display = shouldShow ? 'block' : 'none';
+            });
+        }
+
+        function clearCurrentTerminal() {
+            if (!activeTerminalId || !terminals[activeTerminalId]) {
+                return;
+            }
+
+            // Clear the logs div
+            terminals[activeTerminalId].logsDiv.innerHTML = '';
+
+            // Send message to extension to clear backend data
+            vscode.postMessage({
+                command: 'clear',
+                terminalId: activeTerminalId
+            });
+        }
+
+        function scrollToBottom(element) {
+            element.scrollTop = element.scrollHeight;
+        }
+
+        // Listen for messages from the extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+            console.log('Webview received message:', message.command, message);
+            
+            switch (message.command) {
+                case 'addTerminal':
+                    console.log('Adding terminal:', message.terminalId, message.terminalName);
+                    addTerminal(message.terminalId, message.terminalName);
+                    break;
+                case 'addLog':
+                    addLog(message.terminalId, message.log);
+                    break;
+                case 'removeTerminal':
+                    console.log('Removing terminal:', message.terminalId);
+                    removeTerminal(message.terminalId);
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -347,14 +347,20 @@ function createLogsPanel(context: vscode.ExtensionContext) {
 }
 
 function getWebviewContent(context: vscode.ExtensionContext): string {
-	const htmlPath = path.join(context.extensionPath, 'src', 'webview', 'index.html');
+	// Try production path first (out/webview/index.html)
+	let htmlPath = path.join(context.extensionPath, 'out', 'webview', 'index.html');
+	
+	// Fall back to development path if production doesn't exist
+	if (!fs.existsSync(htmlPath)) {
+		htmlPath = path.join(context.extensionPath, 'src', 'webview', 'index.html');
+	}
 	
 	try {
 		const htmlContent = fs.readFileSync(htmlPath, 'utf8');
 		return htmlContent;
 	} catch (error) {
-		vscode.window.showErrorMessage('Failed to load webview HTML file.');
-		return '<html><body><h1>Error loading webview</h1></body></html>';
+		vscode.window.showErrorMessage(`Failed to load webview HTML file from: ${htmlPath}`);
+		return `<html><body><h1>Error loading webview</h1><p>Path: ${htmlPath}</p><p>Error: ${error}</p></body></html>`;
 	}
 }
 
