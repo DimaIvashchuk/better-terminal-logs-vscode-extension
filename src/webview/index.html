@@ -45,23 +45,66 @@
             gap: 8px;
         }
 
-        .search-input {
-            padding: 6px 12px;
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
             background-color: var(--vscode-input-background);
-            color: var(--vscode-input-foreground);
             border: 1px solid var(--vscode-input-border);
             border-radius: 4px;
+            padding: 4px 8px;
+        }
+
+        .search-container:focus-within {
+            border-color: var(--vscode-focusBorder);
+        }
+
+        .search-input {
+            background-color: transparent;
+            color: var(--vscode-input-foreground);
+            border: none;
             font-size: 13px;
             outline: none;
             min-width: 200px;
-        }
-
-        .search-input:focus {
-            border-color: var(--vscode-focusBorder);
+            padding: 2px 4px;
         }
 
         .search-input::placeholder {
             color: var(--vscode-input-placeholderForeground);
+        }
+
+        .search-counter {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            white-space: nowrap;
+            padding: 0 4px;
+        }
+
+        .search-nav-btn {
+            background: transparent;
+            border: none;
+            color: var(--vscode-foreground);
+            cursor: pointer;
+            padding: 2px 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 2px;
+            font-size: 16px;
+            line-height: 1;
+        }
+
+        .search-nav-btn:hover {
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+
+        .search-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .search-nav-btn:disabled:hover {
+            background-color: transparent;
         }
 
         .filter-select {
@@ -294,6 +337,22 @@
             background-color: rgba(255, 165, 0, 0.08);
         }
 
+        /* Search highlighting */
+
+        .search-highlight.active {
+            background-color: var(--vscode-editor-findMatchBackground);
+            border: 1px solid var(--vscode-editor-findMatchBorder);
+        }
+
+        .search-highlight {
+            background-color: var(--vscode-editor-findMatchHighlightBackground);
+            border-color: var(--vscode-editor-findMatchHighlightBorder);
+            border-radius: 2px;
+            padding: 0 1px;
+        }
+
+      
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -324,7 +383,12 @@
     <div class="header">
         <h2>🔍 Better Terminal Logs</h2>
         <div class="header-controls">
-            <input type="text" id="searchInput" class="search-input" placeholder="Search logs..." oninput="handleSearch(this.value)">
+            <div class="search-container">
+                <input type="text" id="searchInput" class="search-input" placeholder="Search logs..." oninput="handleSearch(this.value)">
+                <span id="searchCounter" class="search-counter"></span>
+                <button id="prevMatchBtn" class="search-nav-btn" onclick="navigateToPrevMatch()" title="Previous match">▲</button>
+                <button id="nextMatchBtn" class="search-nav-btn" onclick="navigateToNextMatch()" title="Next match">▼</button>
+            </div>
             <select id="filterSelect" class="filter-select" onchange="handleFilter(this.value)">
                 <option value="all">All Logs</option>
                 <option value="error">Errors Only</option>
@@ -356,6 +420,8 @@
         const terminals = {};
         let currentSearchTerm = '';
         let currentFilter = 'all';
+        let searchMatches = [];
+        let currentMatchIndex = -1;
 
         function addTerminal(terminalId, terminalName) {
             if (terminals[terminalId]) {
@@ -562,6 +628,8 @@
 
         function handleSearch(searchTerm) {
             currentSearchTerm = searchTerm.toLowerCase();
+            currentMatchIndex = -1;
+            searchMatches = [];
             applyFilters();
         }
 
@@ -570,13 +638,84 @@
             applyFilters();
         }
 
+        function highlightSearchMatches(element, searchTerm) {
+            // Remove existing highlights
+            const existingHighlights = element.querySelectorAll('.search-highlight');
+            existingHighlights.forEach(highlight => {
+                const parent = highlight.parentNode;
+                parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
+                parent.normalize();
+            });
+
+            if (!searchTerm) {
+                return [];
+            }
+
+            const matches = [];
+            const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+
+            const nodesToProcess = [];
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.textContent.toLowerCase().includes(searchTerm)) {
+                    nodesToProcess.push(node);
+                }
+            }
+
+            nodesToProcess.forEach(textNode => {
+                const text = textNode.textContent;
+                const lowerText = text.toLowerCase();
+                const parent = textNode.parentNode;
+                
+                let lastIndex = 0;
+                let index = lowerText.indexOf(searchTerm);
+                
+                if (index === -1) return;
+
+                const fragment = document.createDocumentFragment();
+                
+                while (index !== -1) {
+                    // Add text before match
+                    if (index > lastIndex) {
+                        fragment.appendChild(document.createTextNode(text.substring(lastIndex, index)));
+                    }
+                    
+                    // Add highlighted match
+                    const matchSpan = document.createElement('span');
+                    matchSpan.className = 'search-highlight';
+                    matchSpan.textContent = text.substring(index, index + searchTerm.length);
+                    fragment.appendChild(matchSpan);
+                    matches.push(matchSpan);
+                    
+                    lastIndex = index + searchTerm.length;
+                    index = lowerText.indexOf(searchTerm, lastIndex);
+                }
+                
+                // Add remaining text
+                if (lastIndex < text.length) {
+                    fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+                }
+                
+                parent.replaceChild(fragment, textNode);
+            });
+
+            return matches;
+        }
+
         function applyFilters() {
             if (!activeTerminalId || !terminals[activeTerminalId]) {
+                updateSearchCounter();
                 return;
             }
 
             const logsDiv = terminals[activeTerminalId].logsDiv;
             const logEntries = logsDiv.querySelectorAll('.log-entry');
+            searchMatches = [];
 
             logEntries.forEach(logEntry => {
                 let shouldShow = true;
@@ -596,17 +735,88 @@
                     shouldShow = false;
                 }
 
-                // Apply search filter
+                // Apply search filter and highlighting
                 if (shouldShow && currentSearchTerm) {
                     const logText = logEntry.textContent.toLowerCase();
                     if (!logText.includes(currentSearchTerm)) {
                         shouldShow = false;
+                    } else {
+                        // Highlight matches in this visible entry
+                        const matches = highlightSearchMatches(logEntry, currentSearchTerm);
+                        searchMatches.push(...matches);
                     }
+                } else if (!currentSearchTerm) {
+                    // Clear highlights if no search term
+                    highlightSearchMatches(logEntry, '');
                 }
 
                 // Show or hide
                 logEntry.style.display = shouldShow ? 'block' : 'none';
             });
+
+            updateSearchCounter();
+            
+            // Auto-navigate to first match if available
+            if (searchMatches.length > 0 && currentMatchIndex === -1) {
+                currentMatchIndex = 0;
+                navigateToMatch(0);
+            }
+        }
+
+        function updateSearchCounter() {
+            const counter = document.getElementById('searchCounter');
+            const prevBtn = document.getElementById('prevMatchBtn');
+            const nextBtn = document.getElementById('nextMatchBtn');
+
+            if (searchMatches.length === 0 || !currentSearchTerm) {
+                counter.textContent = '';
+                prevBtn.disabled = true;
+                nextBtn.disabled = true;
+            } else {
+                counter.textContent = `${currentMatchIndex + 1} of ${searchMatches.length}`;
+                prevBtn.disabled = false;
+                nextBtn.disabled = false;
+            }
+        }
+
+        function navigateToMatch(index) {
+            if (searchMatches.length === 0) return;
+
+            // Remove active class from all matches
+            searchMatches.forEach(match => match.classList.remove('active'));
+
+            // Add active class to current match
+            if (index >= 0 && index < searchMatches.length) {
+                currentMatchIndex = index;
+                const match = searchMatches[index];
+                match.classList.add('active');
+                
+                // Check if the match is inside a collapsed <details> element
+                let detailsElement = match.closest('details');
+                if (detailsElement && !detailsElement.open) {
+                    // Open the details element to reveal the match
+                    detailsElement.open = true;
+                }
+                
+                // Scroll to match (with a slight delay to allow details to expand)
+                setTimeout(() => {
+                    match.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+                
+                updateSearchCounter();
+            }
+        }
+
+        function navigateToPrevMatch() {
+            if (searchMatches.length === 0) return;
+            const newIndex = currentMatchIndex > 0 ? currentMatchIndex - 1 : searchMatches.length - 1;
+            navigateToMatch(newIndex);
+        }
+
+        function navigateToNextMatch() {
+            if (searchMatches.length === 0) return;
+            const newIndex = currentMatchIndex < searchMatches.length - 1 ? currentMatchIndex + 1 : 0;
+            navigateToMatch(newIndex);
         }
 
         function clearCurrentTerminal() {
