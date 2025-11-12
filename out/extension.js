@@ -191,33 +191,60 @@ function cleanTerminalOutput(data) {
 }
 function detectLogType(text) {
     const lowerText = text.toLowerCase();
-    // Error patterns
+    // Exclude patterns - these indicate the keyword is NOT an error/warning
+    // (e.g., JSON properties, object keys, documentation)
+    const excludePatterns = [
+        /[{,]\s*["']?(error|warning|failed|failure|exception|warn)["\']?\s*:/i, // JSON properties: { error: 'value' }
+        /:\s*["']?(error|warning|failed|failure|exception|warn)["']?\s*[,}]/i, // JSON values: { key: 'error' }
+    ];
+    // Check if this is likely a false positive (JSON object, etc.)
+    for (const exclude of excludePatterns) {
+        if (exclude.test(text)) {
+            return 'normal';
+        }
+    }
+    // High-priority error patterns (most specific, checked first)
+    const highPriorityErrorPatterns = [
+        /\[ERROR\]/i,
+        /ERR!/i,
+        /✗|❌|⨯/,
+        /^(\s*)at\s+/m, // Stack traces
+        /exit code [1-9]/i,
+        /throw(s|n)?\s+(new\s+)?\w*error/i, // "throw Error", "throws Error"
+        /uncaught\s+exception/i,
+        /\bfatal\s+(error|exception)/i,
+    ];
+    // Medium-priority error patterns (need more context)
     const errorPatterns = [
-        /\berror\b/i,
-        /\bfailed\b/i,
+        /^error:/i, // Lines starting with "Error:"
+        /\berror\s*:/i, // "Error: something"
+        /:\s*error\b/i, // "Something: error"
+        /\bfailed\s+to\b/i, // "failed to do something"
         /\bfailure\b/i,
         /\bexception\b/i,
-        /\bfatal\b/i,
         /\bcannot\b/i,
         /\bunable to\b/i,
         /\bnot found\b/i,
         /\binvalid\b/i,
         /\bdenied\b/i,
         /\brefused\b/i,
-        /exit code [1-9]/i,
-        /^(\s*)at\s+/m, // Stack traces
-        /\[ERROR\]/i,
-        /ERR!/i,
-        /✗|❌|⨯/,
     ];
     // Warning patterns
     const warningPatterns = [
-        /\bwarn(ing)?\b/i,
-        /\bcaution\b/i,
-        /\bdeprecated\b/i,
-        /\[WARN\]/i,
+        /\[WARN(ING)?\]/i,
         /⚠/,
+        /^warning:/i, // Lines starting with "Warning:"
+        /\bwarning\s*:/i, // "Warning: something"
+        /\bwarn(ing)?\s+:/i,
+        /\bdeprecated\b/i,
+        /\bcaution\b/i,
     ];
+    // Check high-priority errors first
+    for (const pattern of highPriorityErrorPatterns) {
+        if (pattern.test(text)) {
+            return 'error';
+        }
+    }
     // Check for errors
     for (const pattern of errorPatterns) {
         if (pattern.test(text)) {
