@@ -5,6 +5,44 @@ All notable changes to the "Better Terminal Logs" extension will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2024-11-12
+
+### ✨ Added
+- **VS Code-Style Search Navigation**:
+  - Match counter showing "X of Y" matches
+  - Previous (▲) and Next (▼) navigation buttons
+  - Keyboard navigation through search results
+  - Auto-scroll to active match (centered view)
+  - Wraps around from last to first match
+- **Search Highlighting**:
+  - All matches highlighted with --vscode-editor-findMatchHighlightBackground
+  - Current/active match highlighted with --vscode-editor-findMatchBackground
+  - Real-time highlight updates as you type
+  - Smart text node traversal for accurate highlighting
+- **Auto-Expand on Navigation**:
+  - Collapsed logs automatically expand when navigating to matches inside them
+  - Smooth transition and scrolling to revealed matches
+- **Preview Image** - Added screenshot to README for better showcase
+
+### 🐛 Fixed
+- **Webview Loading Error** - Fixed "Error loading webview" when installing from VS Code Marketplace
+  - Updated build scripts to include webview assets
+- **False Positive Error Detection** - Significantly improved log type detection
+  - JSON properties like `{ error: 'value' }` no longer incorrectly flagged as errors
+  - Added exclusion patterns for JSON object properties and values
+  - Prioritized error patterns (high/medium priority) for better accuracy
+  - More context-aware patterns (e.g., `Error:`, `failed to` vs just `error`)
+
+### 🔧 Changed
+- Reorganized search controls into unified container with better visual hierarchy
+- Improved search input styling with focus states
+- Enhanced error/warning detection patterns for higher accuracy
+
+### 📚 Documentation
+- Updated README with preview image section
+- Refined installation instructions for marketplace users
+- Added development setup guide
+
 ## [0.0.1] - 2024-11-09
 
 ### 🎉 Initial Release
